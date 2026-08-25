@@ -1,3 +1,4 @@
+# hadolint global ignore=DL3008,DL4006,SC2086
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -26,4 +27,4 @@ RUN chown -R testuser:testuser /workspace
 USER testuser
 WORKDIR /workspace
 
-ENTRYPOINT ["bash", "test/e2e/test-full-e2e.sh"]
+ENTRYPOINT ["bash", "-lc", "npm ci --ignore-scripts && npm run build:cli && NEMOCLAW_RUN_LIVE_E2E=1 npx vitest run --project e2e-live test/e2e/live/full-e2e.test.ts --silent=false --reporter=default"]
