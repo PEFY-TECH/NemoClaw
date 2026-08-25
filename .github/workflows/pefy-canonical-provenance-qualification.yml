@@ -14,20 +14,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - name: Checkout exact candidate
+      - name: Checkout qualification branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Establish canonical NVIDIA repository identity and baseline
+      - name: Detach to exact NVIDIA candidate and establish canonical baseline
         run: |
           set -euo pipefail
+          git checkout --detach fa4eea8cfc89096fe562c3624cb7ec38496ecfda
+          test "$(git rev-parse HEAD)" = "fa4eea8cfc89096fe562c3624cb7ec38496ecfda"
+          test ! -e .github/workflows/pefy-canonical-provenance-qualification.yml
           git remote rename origin pefy
           git remote add origin https://github.com/NVIDIA/NemoClaw.git
           git fetch --no-tags origin main:refs/remotes/origin/main
-          test "$(git rev-parse HEAD)" = "fa4eea8cfc89096fe562c3624cb7ec38496ecfda"
-          canonical_contains="$(git merge-base --is-ancestor HEAD origin/main; echo $?)"
-          test "$canonical_contains" = "0"
+          git merge-base --is-ancestor HEAD origin/main
           test "$(git remote get-url origin)" = "https://github.com/NVIDIA/NemoClaw.git"
       - name: Setup Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -60,9 +61,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: Checkout exact candidate
+      - name: Checkout exact fork candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: fa4eea8cfc89096fe562c3624cb7ec38496ecfda
           persist-credentials: false
       - name: Verify restore action remains repository-bound and fork-capable
         shell: bash
@@ -74,5 +76,6 @@ jobs:
           grep -F '.candidate.repository == $candidateRepository' "$action"
           grep -F '.candidate.sha == $candidateSha' "$action"
           grep -F '.payload.sha256 == $payloadSha256' "$action"
+          test "$(git rev-parse HEAD)" = "fa4eea8cfc89096fe562c3624cb7ec38496ecfda"
           test "$(git remote get-url origin)" = "https://github.com/PEFY-TECH/NemoClaw"
-          echo "The action binds provenance to the actual checkout repository rather than a hard-coded owner."
+          echo "Artifact provenance remains bound to the actual checkout repository, candidate SHA and payload digest."
