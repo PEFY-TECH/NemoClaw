@@ -50,7 +50,10 @@ jobs:
           npm run build:cli
       - name: Run canonical provenance/growth shard 10
         env:
-          NEMOCLAW_GROWTH_PR: '1'
+          # Use the helper's local comparison mode. HEAD is the exact NVIDIA
+          # candidate and origin/main is the canonical NVIDIA branch, so the
+          # helper resolves an immutable local merge-base without requiring a
+          # GitHub token or measuring the PEFY qualification PR itself.
           NEMOCLAW_GROWTH_BASE_REF: 'origin/main'
         run: |
           npx vitest run --project cli --project integration --project e2e-support \
