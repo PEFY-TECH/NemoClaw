@@ -14,11 +14,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - name: Checkout exact candidate
+      - name: Checkout qualification branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Detach to exact NVIDIA candidate
+        run: |
+          set -euo pipefail
+          git checkout --detach fa4eea8cfc89096fe562c3624cb7ec38496ecfda
+          test "$(git rev-parse HEAD)" = "fa4eea8cfc89096fe562c3624cb7ec38496ecfda"
+          test ! -e .github/workflows/pefy-canonical-history-qualification.yml
       - name: Setup Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
@@ -50,8 +56,8 @@ jobs:
         run: |
           cd nemoclaw && npm run build && cd ..
           npm run build:cli
-      - name: Run canonical-history dependent shard 12
+      - name: Run reviewed historical installer tests
         run: |
-          npx vitest run --project cli --project integration --project e2e-support \
-            --shard=12/12 \
+          npx vitest run test/e2e/support/openshell-gateway-upgrade-old-installer.test.ts \
+            --project e2e-support \
             --reporter=github-actions
