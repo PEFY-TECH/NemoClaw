@@ -1,0 +1,81 @@
+name: PEFY Focused Qualification
+
+on:
+  pull_request:
+    branches:
+      - qualification/upstream-base-2026-08-25
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pefy-nemoclaw-focused-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  serving-profile-timeout-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            nemoclaw/package-lock.json
+      - name: Install pinned Pi search tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fd-find=9.0.0-1 ripgrep=14.1.0-1
+      - name: Install dependencies
+        run: bash .github/actions/ci-install-dependencies.sh
+      - name: Build policy and CLI
+        run: |
+          cd nemoclaw && npm run build && cd ..
+          npm run build:cli
+      - name: Run serving-profile test repeatedly
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            echo "Focused repetition $i/5"
+            npx vitest run src/lib/onboard/setup-nim-flow-serving-profile.test.ts --reporter=verbose
+          done
+
+  shard-9-functional:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            nemoclaw/package-lock.json
+      - name: Install pinned Pi search tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fd-find=9.0.0-1 ripgrep=14.1.0-1
+      - name: Install dependencies
+        run: bash .github/actions/ci-install-dependencies.sh
+      - name: Build plugin and CLI
+        run: |
+          cd nemoclaw && npm run build && cd ..
+          npm run build:cli
+      - name: Run functional shard 9 without coverage upload
+        run: |
+          npx vitest run --project cli --project integration --project e2e-support \
+            --shard=9/12 \
+            --reporter=github-actions
