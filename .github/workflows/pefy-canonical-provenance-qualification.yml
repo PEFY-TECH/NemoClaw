@@ -50,15 +50,41 @@ jobs:
           npm run build:cli
       - name: Run canonical provenance/growth shard 10
         env:
-          # Use the helper's local comparison mode. HEAD is the exact NVIDIA
-          # candidate and origin/main is the canonical NVIDIA branch, so the
-          # helper resolves an immutable local merge-base without requiring a
-          # GitHub token or measuring the PEFY qualification PR itself.
           NEMOCLAW_GROWTH_BASE_REF: 'origin/main'
         run: |
           npx vitest run --project cli --project integration --project e2e-support \
             --shard=10/12 \
             --reporter=github-actions
+
+  serving-profile-stability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact NVIDIA candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fa4eea8cfc89096fe562c3624cb7ec38496ecfda
+          persist-credentials: false
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            nemoclaw/package-lock.json
+      - name: Install dependencies
+        run: bash .github/actions/ci-install-dependencies.sh
+      - name: Repeat canonical 5-second serving-profile test
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            echo "serving-profile canonical repetition ${i}/5"
+            npx vitest run \
+              --project cli --project integration --project e2e-support \
+              src/lib/inference/serving/profile-list.test.ts \
+              --reporter=dot
+          done
 
   fork-provenance-contract:
     runs-on: ubuntu-24.04
