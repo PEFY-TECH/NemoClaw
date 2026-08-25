@@ -1,0 +1,110 @@
+name: PEFY Canonical Provenance Qualification
+
+on:
+  pull_request:
+    branches:
+      - qualification/upstream-base-2026-08-25
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-shard-10:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout qualification branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Detach to exact NVIDIA candidate and establish canonical baseline
+        run: |
+          set -euo pipefail
+          git checkout --detach fa4eea8cfc89096fe562c3624cb7ec38496ecfda
+          test "$(git rev-parse HEAD)" = "fa4eea8cfc89096fe562c3624cb7ec38496ecfda"
+          test ! -e .github/workflows/pefy-canonical-provenance-qualification.yml
+          git remote rename origin pefy
+          git remote add origin https://github.com/NVIDIA/NemoClaw.git
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor HEAD origin/main
+          test "$(git remote get-url origin)" = "https://github.com/NVIDIA/NemoClaw.git"
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            nemoclaw/package-lock.json
+      - name: Install pinned Pi search tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fd-find=9.0.0-1 ripgrep=14.1.0-1
+      - name: Install dependencies
+        run: bash .github/actions/ci-install-dependencies.sh
+      - name: Build plugin and CLI
+        run: |
+          cd nemoclaw && npm run build && cd ..
+          npm run build:cli
+      - name: Run canonical provenance/growth shard 10
+        env:
+          NEMOCLAW_GROWTH_BASE_REF: 'origin/main'
+        run: |
+          npx vitest run --project cli --project integration --project e2e-support \
+            --shard=10/12 \
+            --reporter=github-actions
+
+  serving-profile-stability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact NVIDIA candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fa4eea8cfc89096fe562c3624cb7ec38496ecfda
+          persist-credentials: false
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            nemoclaw/package-lock.json
+      - name: Install dependencies
+        run: bash .github/actions/ci-install-dependencies.sh
+      - name: Repeat canonical 5-second serving-profile test
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            echo "serving-profile canonical repetition ${i}/5"
+            npx vitest run \
+              --project cli --project integration --project e2e-support \
+              src/lib/inference/serving/profile-list.test.ts \
+              --reporter=dot
+          done
+
+  fork-provenance-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact fork candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fa4eea8cfc89096fe562c3624cb7ec38496ecfda
+          persist-credentials: false
+      - name: Verify restore action remains repository-bound and fork-capable
+        shell: bash
+        run: |
+          set -euo pipefail
+          action=.github/actions/restore-e2e-cli-artifact/action.yaml
+          grep -F 'remote_url="$(git remote get-url origin)"' "$action"
+          grep -F '[[ "$remote_repository" == "$candidate_repository" ]]' "$action"
+          grep -F '.candidate.repository == $candidateRepository' "$action"
+          grep -F '.candidate.sha == $candidateSha' "$action"
+          grep -F '.payload.sha256 == $payloadSha256' "$action"
+          test "$(git rev-parse HEAD)" = "fa4eea8cfc89096fe562c3624cb7ec38496ecfda"
+          test "$(git remote get-url origin)" = "https://github.com/PEFY-TECH/NemoClaw"
+          echo "Artifact provenance remains bound to the actual checkout repository, candidate SHA and payload digest."
