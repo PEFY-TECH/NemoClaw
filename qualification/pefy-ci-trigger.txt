@@ -1,0 +1,5 @@
+PEFY qualification trigger
+
+Purpose: force a non-metadata pull_request event so NemoClaw's full PR CI path executes against the current NVIDIA upstream baseline.
+
+This file is qualification-only evidence and must not be merged into the production baseline.
